@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilização CSS para cartões, botões e indicadores
+# Estilização CSS para cartões, botões e tabela
 st.markdown("""
     <style>
     .stButton>button {
@@ -74,17 +74,29 @@ if not st.session_state.autenticado:
         st.button("Autenticar Acesso", on_click=verificar_senha, use_container_width=True)
     st.stop()
 
-# --- ÁREA LOGADA DO DASHBOARD ---
+# --- TRATAMENTO E CARREGAMENTO INTELIGENTE DA PLANILHA ---
 
-def tratar_valor_inteligente(df_base, col_nome, deve_calcular_media=False):
-    if col_nome not in df_base.columns:
-        return 0
-    serie = pd.to_numeric(df_base[col_nome], errors='coerce').dropna()
-    if len(serie) == 0:
-        return 0
-    if deve_calcular_media and len(serie) > 1:
-        return serie.mean()
-    return serie.iloc[0]
+def limpar_e_promover_cabecalho(df):
+    """Remove linhas/colunas vazias do topo e ajusta o cabeçalho correto"""
+    df = df.dropna(how='all').dropna(how='all', axis=1)
+    
+    # Verifica se os cabeçalhos atuais são genéricos (ex: Unnamed: 0)
+    if any("unnamed" in str(col).lower() for col in df.columns):
+        for idx in range(min(5, len(df))):
+            linha = df.iloc[idx]
+            # Se a linha contiver textos relevantes, transforma em novo cabeçalho
+            textos = [str(val).strip() for val in linha if pd.notna(val) and str(val) != 'None']
+            if len(textos) >= 2:
+                novas_colunas = []
+                for i, val in enumerate(linha):
+                    if pd.notna(val) and str(val) != 'None':
+                        novas_colunas.append(str(val).strip())
+                    else:
+                        novas_colunas.append(f"Coluna_{i+1}")
+                df.columns = novas_colunas
+                df = df.iloc[idx + 1:].reset_index(drop=True)
+                break
+    return df
 
 @st.cache_data(ttl=0)
 def carregar_dados():
@@ -95,10 +107,11 @@ def carregar_dados():
     
     caminho = arquivos_excel[0]
     xls = pd.ExcelFile(caminho)
-    
     aba_alvo = "Resumo" if "Resumo" in xls.sheet_names else xls.sheet_names[0]
-    df = pd.read_excel(caminho, sheet_name=aba_alvo)
-    return df
+    
+    df_raw = pd.read_excel(caminho, sheet_name=aba_alvo)
+    df_limpo = limpar_e_promover_cabecalho(df_raw)
+    return df_limpo
 
 try:
     df_resumo = carregar_dados()
@@ -106,103 +119,94 @@ except Exception as e:
     st.error(f"Erro ao carregar a planilha: {e}")
     st.stop()
 
-# Barra Lateral (Sidebar)
+# --- BARRA LATERAL ---
 with st.sidebar:
     st.markdown("### Menu Executivo")
     st.write("Conectado como: **CFO / Diretoria**")
     st.markdown("---")
-    st.info("💡 Dados sincronizados com a planilha de controle.")
+    st.info("💡 Dados vinculados ao consolidado executivo.")
     st.markdown("---")
     if st.button("Encerrar Sessão", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
 
-# Cabeçalho Principal
+# --- PAINEL PRINCIPAL ---
 st.title("📊 Painel Executivo - Inadimplência")
-st.caption("Acompanhamento Estratégico de Indicadores Financeiros")
+st.caption("Acompanhamento Estratégico em Tempo Real")
 st.markdown("---")
 
-# Estrutura de Abas do Dashboard
+# Estrutura em Abas
 tab_kpis, tab_graficos, tab_tabela = st.tabs([
     "📊 Visão Geral / KPIs", 
-    "📈 Análise Visual & Gráficos", 
-    "📋 Base de Dados Consolidada"
+    "📈 Análise Visual", 
+    "📋 Tabela Consolidada"
 ])
 
-# --- ABA 1: KPIS E INDICADORES ---
+# --- ABA 1: KPIS ---
 with tab_kpis:
-    st.subheader("Indicadores Chave de Desempenho (KPIs)")
+    st.subheader("Indicadores de Desempenho")
     
-    # Extração e Cálculo dos Métricas principais
-    col_fat = [c for c in df_resumo.columns if 'fat' in str(c).lower() or 'fatur' in str(c).lower()]
-    col_inad = [c for c in df_resumo.columns if 'inad' in str(c).lower() or 'vencid' in str(c).lower()]
-    
-    val_faturamento = tratar_valor_inteligente(df_resumo, col_fat[0]) if col_fat else 0
-    val_inadimplencia = tratar_valor_inteligente(df_resumo, col_inad[0]) if col_inad else 0
-    
-    pct_inadimplencia = (val_inadimplencia / val_faturamento * 100) if val_faturamento > 0 else 0
+    # Conversão de dados para valores numéricos
+    cols_numericas = []
+    for col in df_resumo.columns:
+        converted = pd.to_numeric(df_resumo[col], errors='coerce')
+        if converted.notna().sum() > 0:
+            df_resumo[col] = converted
+            cols_numericas.append(col)
 
     kpi1, kpi2, kpi3 = st.columns(3)
     
+    # Busca inteligente por valores de faturamento e inadimplência
+    val_fat = df_resumo[cols_numericas[0]].sum() if len(cols_numericas) > 0 else 0
+    val_inad = df_resumo[cols_numericas[1]].sum() if len(cols_numericas) > 1 else 0
+    pct_taxa = (val_inad / val_fat * 100) if val_fat > 0 else 0
+
     with kpi1:
-        st.metric(
-            label="Faturamento Total", 
-            value=f"R$ {val_faturamento:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        )
+        st.metric(label="Volume Monitorado", value=f"R$ {val_fat:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     with kpi2:
-        st.metric(
-            label="Inadimplência Total", 
-            value=f"R$ {val_inadimplencia:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        )
+        st.metric(label="Inadimplência Identificada", value=f"R$ {val_inad:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     with kpi3:
-        st.metric(
-            label="Taxa de Inadimplência", 
-            value=f"{pct_inadimplencia:.2f}%"
-        )
+        st.metric(label="Taxa Representativa", value=f"{pct_taxa:.2f}%")
         
     st.markdown("---")
-    st.subheader("Resumo Executivo das Faixas")
-    
-    # Exibição limpa das primeiras linhas de indicadores
-    st.dataframe(df_resumo.head(10), use_container_width=True)
+    st.subheader("Resumo Executivo")
+    st.dataframe(df_resumo, use_container_width=True)
 
-# --- ABA 2: GRÁFICOS INTERATIVOS ---
+# --- ABA 2: GRÁFICOS ---
 with tab_graficos:
-    st.subheader("Análise Gráfica de Inadimplência e Faturamento")
+    st.subheader("Análise Gráfica dos Dados")
     
-    col_g1, col_g2 = st.columns(2)
-    
-    # Preparação de dados numéricos para gráficos Plotly
-    df_numerico = df_resumo.select_dtypes(include=[np.number]).fillna(0)
-    
-    with col_g1:
-        if not df_numerico.empty and len(df_numerico.columns) > 0:
+    if len(cols_numericas) > 0:
+        col_g1, col_g2 = st.columns(2)
+        
+        with col_g1:
             fig_bar = px.bar(
-                df_numerico, 
-                title="Distribuição por Faixa / Categoria",
-                labels={"value": "Valor (R$)", "index": "Registro"},
+                df_resumo, 
+                y=cols_numericas[0],
+                title=f"Distribuição - {cols_numericas[0]}",
                 template="plotly_dark",
-                color_discrete_sequence=["#00e5ff", "#00b8cc", "#ffffff"]
+                color_discrete_sequence=["#00e5ff"]
             )
             fig_bar.update_layout(paper_bgcolor="#0e1e2e", plot_bgcolor="#0e1e2e")
             st.plotly_chart(fig_bar, use_container_width=True)
-        else:
-            st.info("Aguardando mais colunas numéricas para renderizar o gráfico de barras.")
 
-    with col_g2:
-        if not df_numerico.empty and len(df_numerico.columns) > 1:
-            fig_line = px.line(
-                df_numerico, 
-                title="Evolução dos Indicadores",
-                template="plotly_dark",
-                color_discrete_sequence=["#00e5ff", "#ff4b4b"]
-            )
-            fig_line.update_layout(paper_bgcolor="#0e1e2e", plot_bgcolor="#0e1e2e")
-            st.plotly_chart(fig_line, use_container_width=True)
-        else:
-            st.info("Aguardando colunas temporárias/numéricas para o gráfico de evolução.")
+        with col_g2:
+            if len(cols_numericas) > 1:
+                fig_line = px.line(
+                    df_resumo, 
+                    y=cols_numericas[1],
+                    title=f"Tendência - {cols_numericas[1]}",
+                    template="plotly_dark",
+                    color_discrete_sequence=["#ff4b4b"]
+                )
+                fig_line.update_layout(paper_bgcolor="#0e1e2e", plot_bgcolor="#0e1e2e")
+                st.plotly_chart(fig_line, use_container_width=True)
+            else:
+                st.info("Adicione mais colunas numéricas para visualizar a comparação.")
+    else:
+        st.info("Aguardando colunas numéricas para renderização dos gráficos.")
 
-# --- ABA 3: TABELA DETALHADA ---
+# --- ABA 3: TABELA COMPLETA ---
 with tab_tabela:
-    st.subheader("Visão Completa dos Dados")
+    st.subheader("Base de Dados Completa")
     st.dataframe(df_resumo, use_container_width=True)
