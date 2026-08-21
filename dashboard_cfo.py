@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import glob
 
 # Configuração da página
 st.set_page_config(
@@ -42,13 +43,12 @@ def verificar_senha():
     else:
         st.error("Senha incorreta. Tente novamente.")
 
-# Tela de Login (Ajustada e 100% Alinhada)
+# Tela de Login
 if not st.session_state.autenticado:
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # Bloco do Título e Subtítulo Integrais
         st.markdown(
             """
             <div style='text-align: center; margin-bottom: 25px;'>
@@ -73,26 +73,22 @@ if not st.session_state.autenticado:
 
 # --- ÁREA LOGADA DO DASHBOARD ---
 
-def tratar_valor_inteligente(df_base, col_nome, deve_calcular_media=False):
-    if col_nome not in df_base.columns:
-        return 0
-    serie = pd.to_numeric(df_base[col_nome], errors='coerce').dropna()
-    if len(serie) == 0:
-        return 0
-    if deve_calcular_media and len(serie) > 1:
-        return serie.mean()
-    return serie.iloc[0]
-
 @st.cache_data(ttl=0)
 def carregar_dados():
-    caminho_planilha = "Inadimplência_faixa_fat.xlsx"
+    # Localiza automaticamente qualquer arquivo .xlsx na pasta
+    arquivos_excel = glob.glob("*.xlsx")
+    if not arquivos_excel:
+        st.error("Nenhum arquivo .xlsx foi encontrado na pasta do projeto.")
+        st.stop()
+    
+    caminho_planilha = arquivos_excel[0]
     df = pd.read_excel(caminho_planilha, sheet_name="Resumo", header=0)
     return df
 
 try:
     df_resumo = carregar_dados()
 except Exception as e:
-    st.error(f"Erro ao carregar a planilha 'Inadimplência_faixa_fat.xlsx': {e}")
+    st.error(f"Erro ao ler a aba 'Resumo' da planilha: {e}")
     st.stop()
 
 # Barra Lateral (Sidebar)
