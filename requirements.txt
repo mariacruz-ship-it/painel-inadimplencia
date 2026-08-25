@@ -6,3 +6,12 @@ google-api-python-client
 google-auth
 google-auth-httplib2
 google-auth-oauthlib
+streamlit
+pandas
+openpyxl
+plotly
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib
+python-dotenv
