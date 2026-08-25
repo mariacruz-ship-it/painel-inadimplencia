@@ -84,8 +84,21 @@ def carregar_dados():
         status, done = downloader.next_chunk()
     fh.seek(0)
 
-    # 4. Lê a aba Resumo
-    df_raw = pd.read_excel(fh, sheet_name="Resumo", header=3)
+    # 4. Lê a aba Resumo com o cabeçalho na linha correta
+df_raw = pd.read_excel(fh, sheet_name="Resumo", header=1)
+
+# Garante que não existam colunas com nomes duplicados
+seen = {}
+new_cols = []
+for c in df_raw.columns:
+    c_str = str(c).strip()
+    if c_str in seen:
+        seen[c_str] += 1
+        new_cols.append(f"{c_str}_{seen[c_str]}")
+    else:
+        seen[c_str] = 0
+        new_cols.append(c_str)
+df_raw.columns = new_cols
 
     # 5. Trata e ajusta os nomes das colunas
     novos_nomes = []
