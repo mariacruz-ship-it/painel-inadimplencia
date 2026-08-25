@@ -85,7 +85,7 @@ def carregar_dados():
     fh.seek(0)
 
     # 4. Lê a aba Resumo
-    df_raw = pd.read_excel(fh, sheet_name="Resumo", header=[1, 2])
+    ddf_raw = pd.read_excel(fh, sheet_name="Resumo", header=[1, 2])
 
     # 5. Trata e ajusta os nomes das colunas
     novos_nomes = []
