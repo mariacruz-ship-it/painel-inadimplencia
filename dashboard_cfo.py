@@ -100,22 +100,10 @@ for c in df_raw.columns:
         new_cols.append(c_str)
 df_raw.columns = new_cols
 
-    # 5. Trata e ajusta os nomes das colunas
-    novos_nomes = []
-    ultimo_grupo = ""
-    for col in df_raw.columns:
-        grupo = str(col[0]).strip()
-        subgrupo = str(col[1]).strip()
-        if not grupo.startswith("Unnamed"): ultimo_grupo = grupo
-        else: grupo = ultimo_grupo
-        if subgrupo.startswith("Unnamed"): subgrupo = ""
-        
-        nome_final = f"{grupo} - {subgrupo}" if (grupo and subgrupo and grupo != subgrupo) else (subgrupo or grupo)
-        novos_nomes.append(nome_final)
+   # 5. Finaliza o tratamento dos dados
+    df = df_raw.dropna(how="all").reset_index(drop=True)
 
-    df_raw.columns = novos_nomes
-    return df_raw
-
+    return df
 
 def main():
   # 1. Configuração da Página
