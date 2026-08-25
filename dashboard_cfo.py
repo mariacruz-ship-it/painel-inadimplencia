@@ -152,7 +152,7 @@ def extrair_valor_inteligente(df_base, col_nome, deve_calcular_media=False):
 # 4. Leitura dos Dados
 @st.cache_data(ttl=0)
 def carregar_dados():
-    caminho_planilha = "Inadimplência_faixa_fat.xlsx"
+    caminho_planilha = "Inadimplência_faixa_fat - Copia.xlsx"
     df_raw = pd.read_excel(caminho_planilha, sheet_name="Resumo", header=[1, 2])
     
     novos_nomes = []
