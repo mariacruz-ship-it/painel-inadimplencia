@@ -19,7 +19,7 @@ def carregar_dados():
 
     # 2. Conexão Drive
     service = build("drive", "v3", credentials=creds)
-    file_id = "1jJ448O2fQf382aOThx3-A2Xo7p67O3yV"  # ID do seu arquivo no Drive
+    file_id = "1pZUGLPLb9I17QZiYm4AzZHhWrkUe351f"  # ID atualizado da planilha da TI
 
     request = service.files().get_media(fileId=file_id)
     fh = io.BytesIO()
